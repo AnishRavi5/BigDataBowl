@@ -1,0 +1,145 @@
+---
+title: "Big Data Bowl"
+author: "Varun Ramanathan"
+date: "2023-10-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(dplyr)
+
+# Load the datasets
+plays <- read.csv("plays.csv")
+players <- read.csv("players.csv")
+tackles <- read.csv("tackles.csv")
+unique_nfl_ids <- unique(tackles$nflId)
+
+# Initialize an empty dataframe to store merged data
+final_merged_data <- data.frame()
+
+# Loop through all tracking_week files and merge
+for (i in 1:9) {
+  tracking_week_file <- paste0("tracking_week_", i, ".csv")
+  tracking_week_data <- read.csv(tracking_week_file)
+  
+  # Merge with `plays.csv`
+  merged_data <- merge(tracking_week_data, plays, by = c("gameId", "playId"), all.x = TRUE)
+  
+  # Merge with `players.csv`
+  merged_data <- merge(merged_data, players, by = "nflId", all.x = TRUE)
+  
+  # Merge with `tackles.csv`
+  final_merged_data <- rbind(final_merged_data, merge(merged_data, tackles, by = c("gameId", "playId", "nflId"), all.x = TRUE))
+}
+
+# View the merged dataset
+subset_merged_data <- final_merged_data %>%
+  filter(nflId %in% unique_nfl_ids)
+
+subset_merged_data <- subset_merged_data %>%
+  filter(!is.na(event))
+
+final_subset <- subset_merged_data %>%
+  semi_join(tackles, by = c("gameId", "playId", "nflId"))
+
+final_subset <- final_subset %>%
+  filter(playNullifiedByPenalty == "N")
+tackle_subset <- final_subset %>%
+  filter(event == "tackle")
+
+colnames(final_subset)
+
+final_subset <- final_subset %>%
+  rename(
+    gameId = gameId,
+    playId = playId,
+    nflId = nflId,
+    displayName = displayName.x,
+    frameId = frameId,
+    time = time,
+    jerseyNumber = jerseyNumber,
+    club = club,
+    playDirection = playDirection,
+    x = x,
+    y = y,
+    speed = s,  # Assuming s is the speed column in your dataset
+    acceleration = a,  # Assuming a is the acceleration column in your dataset
+    `distance travelled` = dis,
+    `player orientation` = o,
+    `angle of player motion` = dir,
+    event = event,
+    ballCarrierId = ballCarrierId,
+    ballCarrierDisplayName = ballCarrierDisplayName,
+    playDescription = playDescription,
+    quarter = quarter,
+    down = down,
+    yardsToGo = yardsToGo,
+    possessionTeam = possessionTeam,
+    defensiveTeam = defensiveTeam,
+    yardlineSide = yardlineSide,
+    yardlineNumber = yardlineNumber,
+    gameClock = gameClock,
+    preSnapHomeScore = preSnapHomeScore,
+    preSnapVisitorScore = preSnapVisitorScore,
+    passResult = passResult,
+    passLength = passLength,
+    penaltyYards = penaltyYards,
+    prePenaltyPlayResult = prePenaltyPlayResult,
+    playResult = playResult,
+    playNullifiedByPenalty = playNullifiedByPenalty,
+    absoluteYardlineNumber = absoluteYardlineNumber,
+    offenseFormation = offenseFormation,
+    defendersInTheBox = defendersInTheBox,
+    passProbability = passProbability,
+    preSnapHomeTeamWinProbability = preSnapHomeTeamWinProbability,
+    preSnapVisitorTeamWinProbability = preSnapVisitorTeamWinProbability,
+    homeTeamWinProbabilityAdded = homeTeamWinProbabilityAdded,
+    visitorTeamWinProbabilityAdded = visitorTeamWinProbilityAdded,
+    expectedPoints = expectedPoints,
+    expectedPointsAdded = expectedPointsAdded,
+    foulName1 = foulName1,
+    foulName2 = foulName2,
+    foulNFLId1 = foulNFLId1,
+    foulNFLId2 = foulNFLId2,
+    height = height,
+    weight = weight,
+    birthDate = birthDate,
+    collegeName = collegeName,
+    position = position,
+    displayName.y = displayName.y,
+    tackle = tackle,
+    assist = assist,
+    forcedFumble = forcedFumble,
+    pff_missedTackle = pff_missedTackle
+  )
+columns_to_exclude <- c(
+  "time", "playDirection", "quarter", "down", "yardsToGo", "possessionTeam",
+  "defensiveTeam", "yardlineSide", "yardlineNumber", "gameClock",
+  "preSnapHomeScore", "preSnapVisitorScore", "passResult",
+  "penaltyYards", "prePenaltyPlayResult", "playNullifiedByPenalty",
+  "absoluteYardlineNumber", "preSnapHomeTeamWinProbability", "preSnapVisitorTeamWinProbability",
+  "homeTeamWinProbabilityAdded", "visitorTeamWinProbabilityAdded",
+  "expectedPoints", "expectedPointsAdded", "foulName1", "foulName2",
+  "foulNFLId1", "foulNFLId2", "birthDate", "collegeName"
+)
+
+# Create a subset without the specified columns
+final_subset_filtered <- select(final_subset, -one_of(columns_to_exclude))
+
+final_subset_filtered$displayName <- final_subset_filtered$displayName.y
+
+# Remove the displayName.y column
+final_subset_filtered <- final_subset_filtered[, !(names(final_subset_filtered) %in% c("displayName.y"))]
+
+unique_missed_tackles <- unique(final_subset_filtered$pff_missedTackle)
+
+# View the unique values
+print(unique_missed_tackles)
+
+table(final_subset_filtered$tackle)
+```
